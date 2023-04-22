@@ -20,17 +20,12 @@ int main() {
     // Get user input for server address, port, username, password, and file to download
     char server_address[MAX_SIZE];
     int server_port;
-    char username[MAX_SIZE];
-    char password[MAX_SIZE];
+
     char file[MAX_SIZE];
     printf("Enter server address: ");
     scanf("%s", server_address);
     printf("Enter server port: ");
     scanf("%d", &server_port);
-    printf("Enter username: ");
-    scanf("%s", username);
-    printf("Enter password: ");
-    scanf("%s", password);
     printf("Enter file to download: ");
     scanf("%s", file);
 
@@ -57,18 +52,6 @@ int main() {
 
     // Receive the server's welcome message
     char buffer[MAX_SIZE];
-    receive_data(sock_fd, buffer, MAX_SIZE);
-    printf("%s", buffer);
-
-    // Send a login request to the server
-    sprintf(buffer, "USER %s\r\n", username);
-    send(sock_fd, buffer, strlen(buffer), 0);
-    receive_data(sock_fd, buffer, MAX_SIZE);
-    printf("%s", buffer);
-
-    // Send a password request to the server
-    sprintf(buffer, "PASS %s\r\n", password);
-    send(sock_fd, buffer, strlen(buffer), 0);
     receive_data(sock_fd, buffer, MAX_SIZE);
     printf("%s", buffer);
 
