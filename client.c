@@ -10,8 +10,6 @@
 
 #define MAX_SIZE 1024
 
-
-// WHERE THE FUCK IS THIS USED??
 void receive_cmd(int sock_fd, char *buffer, size_t buffer_size) {
     int bytes_received = 0;
     while (bytes_received <= 0) {

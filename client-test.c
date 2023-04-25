@@ -10,9 +10,11 @@
 #include <errno.h>
 
 #define MAX_SIZE 1024
+//For each function/method, explain its purpose, explain the values and
+//meaning of parameters, return value, and any possible side effects;
+
 
 char getLocalAddr() {
-
     struct addrinfo hints, *res;
     int status;
     char ipstr[INET6_ADDRSTRLEN];
@@ -23,6 +25,7 @@ char getLocalAddr() {
     hints.ai_socktype = SOCK_STREAM; // use TCP
 
     // get the address info for the localhost
+    //Instance ID: 4-8
     if ((status = getaddrinfo("localhost", NULL, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
@@ -54,6 +57,8 @@ char getLocalAddr() {
     return *ipstr;
 }
 
+//Instance ID: 1-1
+//using recv with buffer size instead of without
 void receive_cmd(int sock_fd, char *buffer, size_t buffer_size) {
     int bytes_received = 0;
     while (bytes_received <= 0) {
@@ -63,18 +68,21 @@ void receive_cmd(int sock_fd, char *buffer, size_t buffer_size) {
 }
 
 // Generate a random number in the range of the registered TCP ports for use on the client
+//Instance ID: 7-2, avoiding ports below 1024 as they are restricted
 int port_number() {
     int cntrl_port;
     srand(time(NULL));  // Seed the random number generator with the current time
-    
+
     cntrl_port = rand() % (49151 - 1024 + 1) + 1024; // Generate a random number between 1024 and 49151 (registered ports)
 
     return cntrl_port;
 }
 
 // Check to see if the port generated above is in use; if it is, try again
+//Instance ID: 7-1, avoiding using a port that is in use
 int is_port_in_use(int port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    //Instance ID: 4-1, catching exception
     if (sockfd < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
@@ -88,7 +96,7 @@ int is_port_in_use(int port) {
 
     int bind_res = bind(sockfd, (struct sockaddr*)&addr, sizeof(addr));
     close(sockfd);
-    
+
     if (bind_res < 0) {
         if (errno == EADDRINUSE) {
             is_port_in_use(port_number());
@@ -97,8 +105,8 @@ int is_port_in_use(int port) {
         }
     } else {
         if (is_port_in_use(port+1)) {
-            is_port_in_use(port_number());            
-        }        
+            is_port_in_use(port_number());
+        }
         return 0;
     }
     // "Control may reach end of non-void function" warning -- should I care?
@@ -125,13 +133,14 @@ int main () {
     char EXIT[] = "exit";
 
     // Prompt user for server IP address
-    printf("Enter server address: "); 
+    printf("Enter server address: ");
     scanf("%s", server_cntrl_address);
 
 // CONTROL SOCKET #####################################################################################################
-    
+
 
     // Create control socket
+    //Instance ID: 4-2, catching exception
     int cntrl_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (cntrl_sock_fd < 0) {
         perror("Socket creation failed");
@@ -145,19 +154,20 @@ int main () {
     client_cntrl_addr.sin_port = htons(cntrl_port);
     socklen_t server_cntrl_addr_len = sizeof(client_cntrl_addr);
 
+    //Instance ID: 4-3, avoiding error by checking binding
     if (bind(cntrl_sock_fd, (struct sockaddr *)&client_cntrl_addr, sizeof(client_cntrl_addr)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
-    // Start listening on the socket 
+    // Start listening on the socket
+    //Instance ID: 4-4
     if (listen(cntrl_sock_fd, 1) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
     }
 
-// CONTROL CONECTION TO SERVER #####################################################################################################
-
+// CONTROL CONNECTION TO SERVER
 
     // Form control connection to the server
     struct sockaddr_in server_cntrl_addr;
@@ -165,10 +175,14 @@ int main () {
     server_cntrl_addr.sin_family = AF_INET;
     server_cntrl_addr.sin_port = htons(cntrl_port);
     is_port_in_use(cntrl_port);
+
+    //Instance ID: 4-5
     if (inet_pton(AF_INET, server_cntrl_address, &server_cntrl_addr.sin_addr) <= 0) {
         perror("Invalid server address");
         exit(EXIT_FAILURE);
     }
+
+    //Instance ID: 4-6
     if (connect(cntrl_sock_fd, (struct sockaddr *)&server_cntrl_addr, sizeof(server_cntrl_addr)) < 0) {
         perror("Connection failed");
         exit(EXIT_FAILURE);
@@ -177,107 +191,100 @@ int main () {
     // Write the localhost address to the buffer and send to the server
     snprintf(buffer, sizeof(buffer), "%c %d", getLocalAddr(), cntrl_port);
 
-    /*
-    snprintf(buffer, sizeof(buffer), 
-        (int)(client_cntrl_addr.sin_addr.s_addr & 0xff),
-        (int)((client_cntrl_addr.sin_addr.s_addr >> 8) & 0xff),
-        (int)((client_cntrl_addr.sin_addr.s_addr >> 16) & 0xff),
-        (int)((client_cntrl_addr.sin_addr.s_addr >> 24) & 0xff)
-        );
-    */
 
     if (send(cntrl_sock_fd, buffer, strlen(buffer), 0) < 0) {
         printf("Error sending PORT\n");
         close(cntrl_sock_fd);
         exit(1);
-    }    
+    }
 
     while (1) {
 
-    printf("What would you like to do? ");
-    scanf("%s", command);
+        printf("What would you like to do? ");
+        scanf("%s", command);
 
-// COMMAND HANDLERS #####################################################################################################
+        // COMMAND HANDLERS
 
-// EXIT
-    if (strncmp(command, EXIT, 4) == 0) {
-        sprintf(buffer, "EXIT %s\r\n", file);
-        send(cntrl_sock_fd, buffer, strlen(buffer), 0);
-        close(cntrl_sock_fd);
-        printf("Connections closed! Have a bad day.");
-        break;
-    }
-
-// RETR
-    if (strncmp(command, RETR, 4) == 0)  {
-
-        // Create data socket
-        int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (data_sock_fd < 0) {
-            perror("Socket creation failed");
-            exit(EXIT_FAILURE);
-        }  
-
-        // Form data connection to the server
-        struct sockaddr_in server_data_addr;
-        memset(&server_data_addr, 0, sizeof(server_data_addr));
-        server_data_addr.sin_family = AF_INET;
-        server_data_addr.sin_port = htons(cntrl_port+1);
-        is_port_in_use(cntrl_port+1);
-        if (inet_pton(AF_INET, server_data_address, &server_data_addr.sin_addr) <= 0) {
-            perror("invalid server address");
-            exit(EXIT_FAILURE);
+        // EXIT
+        if (strncmp(command, EXIT, 4) == 0) {
+            sprintf(buffer, "EXIT %s\r\n", file);
+            send(cntrl_sock_fd, buffer, strlen(buffer), 0);
+            close(cntrl_sock_fd);
+            printf("Connections closed! Have a bad day.");
+            break;
         }
-        if (connect(data_sock_fd, (struct sockaddr *)&server_cntrl_addr, sizeof(server_cntrl_addr)) < 0) {
-            perror("connection failed");
-            exit(EXIT_FAILURE);
-        }    
-      
-        printf("Enter the name of the file: ");
-        scanf("%s", file);
-    
-        // Send a command to download the file
-        sprintf(buffer, "RETR %s\r\n", file);
-        send(cntrl_sock_fd, buffer, strlen(buffer), 0);
-        receive_cmd(data_sock_fd, buffer, MAX_SIZE);
-        printf("%s", buffer);
 
-                
-        // Open a file to write the data to
-        FILE *fp = fopen(file, "wb");
-        if (fp == NULL) {
-            perror("File opening failed");
-            exit(EXIT_FAILURE);
-        }  
+        // RETR
+        if (strncmp(command, RETR, 4) == 0)  {
 
-        // Read the data from the socket and write it to the file
-        int bytes_received = 0;
-        while ((bytes_received = recv(data_sock_fd, buffer, MAX_SIZE, 0)) > 0) {
-        fwrite(buffer, 1, bytes_received, fp);
-        
+            // Create data socket
+            int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+            //Instance ID: 4-7
+            if (data_sock_fd < 0) {
+                perror("Socket creation failed");
+                exit(EXIT_FAILURE);
+            }
+
+            // Form data connection to the server
+            struct sockaddr_in server_data_addr;
+            memset(&server_data_addr, 0, sizeof(server_data_addr));
+            server_data_addr.sin_family = AF_INET;
+            server_data_addr.sin_port = htons(cntrl_port+1);
+            is_port_in_use(cntrl_port+1);
+            if (inet_pton(AF_INET, server_data_address, &server_data_addr.sin_addr) <= 0) {
+                perror("invalid server address");
+                exit(EXIT_FAILURE);
+            }
+            if (connect(data_sock_fd, (struct sockaddr *)&server_cntrl_addr, sizeof(server_cntrl_addr)) < 0) {
+                perror("connection failed");
+                exit(EXIT_FAILURE);
+            }
+
+            printf("Enter the name of the file: ");
+            scanf("%s", file);
+
+            // Send a command to download the file
+            sprintf(buffer, "RETR %s\r\n", file);
+            send(cntrl_sock_fd, buffer, strlen(buffer), 0);
+            receive_cmd(data_sock_fd, buffer, MAX_SIZE);
+            printf("%s", buffer);
+
+
+            // Open a file to write the data to
+            //Instance ID: 8-1, preventing existing data from being overwritten
+            int result = access(file, F_OK);
+            if(result != 0) {
+                FILE *fp = fopen(file, "wb");
+            }
+            if (fp == NULL) {
+                perror("File opening failed");
+                exit(EXIT_FAILURE);
+            }
+
+            // Read the data from the socket and write it to the file
+            int bytes_received = 0;
+            while ((bytes_received = recv(data_sock_fd, buffer, MAX_SIZE, 0)) > 0) {
+                fwrite(buffer, 1, bytes_received, fp);
+            }
+
+            fclose(fp);
+            close(data_sock_fd);
+
         }
-    
-        fclose(fp);
-        close(data_sock_fd);
-        
-    }
 
-// PWD
-    else if (strncmp(command, PWD, 3) == 0)  {
+        // PWD
+        else if (strncmp(command, PWD, 3) == 0)  {
+            // Send a command to download the file
+            sprintf(buffer, "PWD\r\n");
+            send(cntrl_sock_fd, buffer, strlen(buffer), 0);
+            receive_cmd(cntrl_sock_fd, buffer, MAX_SIZE);
+            printf("%s", buffer);
+        }
 
-        // Send a command to download the file
-        sprintf(buffer, "PWD\r\n");
-        send(cntrl_sock_fd, buffer, strlen(buffer), 0);
-        receive_cmd(cntrl_sock_fd, buffer, MAX_SIZE);
-        printf("%s", buffer);        
+        // STOR
+        else if (strncmp(command, STOR, 4) == 0) {
 
-    }
-
-// STOR
-    else if (strncmp(command, STOR, 4) == 0) {
-
+        }
 
     }
-
-    }  
 }

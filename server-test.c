@@ -11,7 +11,6 @@
 #define DATA_PORT 20
 
 char getLocalAddr() {
-
     struct addrinfo hints, *res;
     int status;
     char ipstr[INET6_ADDRSTRLEN];
@@ -22,6 +21,7 @@ char getLocalAddr() {
     hints.ai_socktype = SOCK_STREAM; // use TCP
 
     // get the address info for the localhost
+    //Instance ID: 4-8
     if ((status = getaddrinfo("localhost", NULL, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
@@ -71,6 +71,7 @@ int main () {
 
 
     // Create a socket for listening
+    //Instance ID: 4-10
     int cntrl_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (cntrl_sock_fd < 0) {
         perror("socket creation failed");
@@ -103,11 +104,11 @@ int main () {
     while (1) {
 
         // Accept a control connection from a client
-       /* struct sockaddr_in client_cntrl_addr = {0};
-        client_cntrl_addr.sin_family = AF_INET;
-        client_cntrl_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        // client_cntrl_addr.sin_port = htons(client_cntrl_port); // BIND TO PROPER PORT -- might not be needed
-        socklen_t client_cntrl_addr_len = sizeof(client_cntrl_addr); */
+        /* struct sockaddr_in client_cntrl_addr = {0};
+         client_cntrl_addr.sin_family = AF_INET;
+         client_cntrl_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+         // client_cntrl_addr.sin_port = htons(client_cntrl_port); // BIND TO PROPER PORT -- might not be needed
+         socklen_t client_cntrl_addr_len = sizeof(client_cntrl_addr); */
 
         if ((client_cntrl_sock_fd = accept(cntrl_sock_fd, (struct sockaddr *)&server_cntrl_addr, &server_cntrl_addr_len) < 0)) {
             perror("Accept failed");
@@ -123,13 +124,12 @@ int main () {
         // Receive a command from the client
         int bytes_received = recv(client_cntrl_sock_fd, buffer, MAX_SIZE, 0);
         if (bytes_received < 0) {
-        perror("Command could not be understood");
-        exit(EXIT_FAILURE);
-            }
+            perror("Command could not be understood");
+            exit(EXIT_FAILURE);
+        }
 
-// COMMAND HANDLERS #####################################################################################################
-
-// PWD
+        // COMMAND HANDLERS
+        // PWD
         if (strncmp(buffer, PWD, 3) == 0) {
 
             // Executes the command and dumps the result into response
@@ -142,6 +142,7 @@ int main () {
                 char temp[MAX_SIZE];
                 memset (temp, 0, sizeof(temp));
                 // Use fgets because it's probably less dangerous
+                //Instance ID: 1-2, preventing buffer overrun by using fgets with a specified size.
                 while (fgets(temp, sizeof(temp), fp) != NULL) {
                     strcat(buffer, temp);
                 }
@@ -154,9 +155,9 @@ int main () {
             printf("Response sent: %s\n", response);
         }
 
-// LS
+        // LS
         else if (strncmp(buffer, LS, 2) == 0) {
-            
+
             // Executes the command and dumps the result into response
             FILE *fp;
             fp = popen(buffer, "r");
@@ -167,6 +168,7 @@ int main () {
                 char temp[MAX_SIZE];
                 memset (temp, 0, sizeof(temp));
                 // Use fgets because it's probably less dangerous
+                //Instance ID: 1-3, preventing buffer overrun by using fgets with a specified size.
                 while (fgets(temp, sizeof(temp), fp) != NULL) {
                     strcat(buffer, temp);
                 }
@@ -174,88 +176,89 @@ int main () {
                 response = buffer;
             }
 
-            // Sends the reponse (result of command execution) to the client over the control socket
+            // Sends the response (result of command execution) to the client over the control socket
             send(client_cntrl_sock_fd, response, strlen(response), 0);
             printf("Response sent: %s\n", response);
-            
-        }   
-// EXIT
+
+        }
+
+        // EXIT
         else if (strncmp(buffer, EXIT, 4) == 0) {
 
-            close (client_cntrl_sock_fd); 
-            close (cntrl_sock_fd);           
-            
+            close (client_cntrl_sock_fd);
+            close (cntrl_sock_fd);
+
             response = "Connections closed on server";
 
-            // Sends the reponse (result of command execution) to the client over the control socket
+            // Sends the response (result of command execution) to the client over the control socket
             send(client_cntrl_sock_fd, response, strlen(response), 0);
             printf("Response sent: %s\n", response);
-            
-        }       
-
-// RETR
-    else if (strncmp(buffer, RETR, 4) == 0) {
-
-        // Parse the file name from the command
-        char filename[MAX_SIZE] = {0};
-        sscanf(buffer, "RETR %s\r\n", filename);
-
-        // Open the file for reading
-        FILE *fp = fopen(filename, "rb");
-        if (fp == NULL) {
-            // Send an error response if the file doesn't exist
-            char *error_response = "550 Requested action not taken. File unavailable.\r\n";
-            send(cntrl_sock_fd, error_response, strlen(error_response), 0);
-        } else {
-            // Send a success response
-            char *success_response = "150 File status okay. About to open data connection.\r\n";
-            send(cntrl_sock_fd, success_response, strlen(success_response), 0);
 
         }
 
-        // Create data socket
-        int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-        if (data_sock_fd < 0) {
-            perror("socket creation failed");
-            exit(EXIT_FAILURE);
-        }
+        // RETR
+        else if (strncmp(buffer, RETR, 4) == 0) {
 
-        // Connect the data socket to the client's address
-        if (connect(data_sock_fd, (struct sockaddr *)&client_cntrl_addr, client_cntrl_addr_len) < 0) {
-            perror("connect failed");
-            close(data_sock_fd); 
-            exit(EXIT_FAILURE);
-        }
-    
-        //Bind the socket to the data port
-        struct sockaddr_in server_data_addr = {0};
-        server_data_addr.sin_family = AF_INET;
-        server_data_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        server_data_addr.sin_port = htons(DATA_PORT);
+            // Parse the file name from the command
+            char filename[MAX_SIZE] = {0};
+            sscanf(buffer, "RETR %s\r\n", filename);
 
-        if (bind(data_sock_fd, (struct sockaddr *)&server_data_addr, sizeof(server_data_addr)) < 0) {
-            perror("bind failed");
-            exit(EXIT_FAILURE);
-        }   
+            // Open the file for reading
+            FILE *fp = fopen(filename, "rb");
+            if (fp == NULL) {
+                // Send an error response if the file doesn't exist
+                char *error_response = "550 Requested action not taken. File unavailable.\r\n";
+                send(cntrl_sock_fd, error_response, strlen(error_response), 0);
+            } else {
+                // Send a success response
+                char *success_response = "150 File status okay. About to open data connection.\r\n";
+                send(cntrl_sock_fd, success_response, strlen(success_response), 0);
 
-        // Send the file data to the client
-        char data_buffer[MAX_SIZE] = {0};
-        size_t bytes_read = 0;
-        while ((bytes_read = fread(data_buffer, sizeof(char), MAX_SIZE, fp)) > 0) {
-            if (send(data_sock_fd, data_buffer, bytes_read, 0) < 0) {
-                perror("send failed");
+            }
+
+            // Create data socket
+            int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
+            if (data_sock_fd < 0) {
+                perror("socket creation failed");
                 exit(EXIT_FAILURE);
             }
-        }   
-    }  
+
+            // Connect the data socket to the client's address
+            if (connect(data_sock_fd, (struct sockaddr *)&client_cntrl_addr, client_cntrl_addr_len) < 0) {
+                perror("connect failed");
+                close(data_sock_fd);
+                exit(EXIT_FAILURE);
+            }
+
+            //Bind the socket to the data port
+            struct sockaddr_in server_data_addr = {0};
+            server_data_addr.sin_family = AF_INET;
+            server_data_addr.sin_addr.s_addr = htonl(INADDR_ANY);
+            server_data_addr.sin_port = htons(DATA_PORT);
+
+            if (bind(data_sock_fd, (struct sockaddr *)&server_data_addr, sizeof(server_data_addr)) < 0) {
+                perror("bind failed");
+                exit(EXIT_FAILURE);
+            }
+
+            // Send the file data to the client
+            char data_buffer[MAX_SIZE] = {0};
+            size_t bytes_read = 0;
+            while ((bytes_read = fread(data_buffer, sizeof(char), MAX_SIZE, fp)) > 0) {
+                if (send(data_sock_fd, data_buffer, bytes_read, 0) < 0) {
+                    perror("send failed");
+                    exit(EXIT_FAILURE);
+                }
+            }
+        }
 // STOR
-    else if (strncmp(buffer, RETR, 4) == 0) { 
+        else if (strncmp(buffer, RETR, 4) == 0) {
 
 
 
 
 
-    }
+        }
 
 // HERE THERE BE DRAGONS 
 
@@ -276,9 +279,9 @@ int main () {
             response = buffer;
         }
 
-            // Sends the reponse (result of command execution) to the client over the control socket
-            send(client_cntrl_sock_fd, response, strlen(response), 0);
-            printf("Response sent: %s\n", response);
+        // Sends the reponse (result of command execution) to the client over the control socket
+        send(client_cntrl_sock_fd, response, strlen(response), 0);
+        printf("Response sent: %s\n", response);
 
     } // while loop
 
