@@ -67,12 +67,18 @@ int main () {
     char PWD[] = "pwd";
     char EXIT[] = "exit";
 
+// CONTROL SOCKET #####################################################################################################
+
+
     // Create a socket for listening
     int cntrl_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (cntrl_sock_fd < 0) {
         perror("socket creation failed");
         exit(EXIT_FAILURE);
     }
+
+// CONTROL CONNECTION #####################################################################################################
+
 
     // Bind the socket to the control port (21)
     struct sockaddr_in server_cntrl_addr = {0};
@@ -121,8 +127,9 @@ int main () {
         exit(EXIT_FAILURE);
             }
 
-        // Check what the command is and act accordingly
+// COMMAND HANDLERS #####################################################################################################
 
+// PWD
         if (strncmp(buffer, PWD, 3) == 0) {
 
             // Executes the command and dumps the result into response
@@ -147,6 +154,7 @@ int main () {
             printf("Response sent: %s\n", response);
         }
 
+// LS
         else if (strncmp(buffer, LS, 2) == 0) {
             
             // Executes the command and dumps the result into response
@@ -171,7 +179,7 @@ int main () {
             printf("Response sent: %s\n", response);
             
         }   
-
+// EXIT
         else if (strncmp(buffer, EXIT, 4) == 0) {
 
             close (client_cntrl_sock_fd); 
@@ -185,6 +193,7 @@ int main () {
             
         }       
 
+// RETR
     else if (strncmp(buffer, RETR, 4) == 0) {
 
         // Parse the file name from the command
@@ -204,6 +213,7 @@ int main () {
 
         }
 
+        // Create data socket
         int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
         if (data_sock_fd < 0) {
             perror("socket creation failed");
@@ -236,9 +246,18 @@ int main () {
                 perror("send failed");
                 exit(EXIT_FAILURE);
             }
-        }     
+        }   
+    }  
+// STOR
+    else if (strncmp(buffer, RETR, 4) == 0) { 
 
 
+
+
+
+    }
+
+// HERE THERE BE DRAGONS 
 
         // Executes the command and dumps the result into response
         FILE *fp;
@@ -264,4 +283,3 @@ int main () {
     } // while loop
 
 } // main
-}
