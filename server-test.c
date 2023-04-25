@@ -21,7 +21,7 @@ char getLocalAddr() {
     hints.ai_socktype = SOCK_STREAM; // use TCP
 
     // get the address info for the localhost
-    //Instance ID: 4-8
+    //Instance ID: 2-9
     if ((status = getaddrinfo("localhost", NULL, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
@@ -71,7 +71,7 @@ int main () {
 
 
     // Create a socket for listening
-    //Instance ID: 4-10
+    //Instance ID: 2-10
     int cntrl_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (cntrl_sock_fd < 0) {
         perror("socket creation failed");
@@ -146,6 +146,7 @@ int main () {
                 while (fgets(temp, sizeof(temp), fp) != NULL) {
                     strcat(buffer, temp);
                 }
+                //Instance: 4-1, preventing buffer leakage by closing file
                 pclose(fp);
                 response = buffer;
             }
@@ -172,6 +173,7 @@ int main () {
                 while (fgets(temp, sizeof(temp), fp) != NULL) {
                     strcat(buffer, temp);
                 }
+                //Instance: 4-2, preventing buffer leakage by closing file
                 pclose(fp);
                 response = buffer;
             }
@@ -204,7 +206,10 @@ int main () {
             sscanf(buffer, "RETR %s\r\n", filename);
 
             // Open the file for reading
-            FILE *fp = fopen(filename, "rb");
+            int result = access(file, R_OK);
+            if (result == 0) {
+                FILE *fp = fopen(filename, "rb");
+            }
             if (fp == NULL) {
                 // Send an error response if the file doesn't exist
                 char *error_response = "550 Requested action not taken. File unavailable.\r\n";
@@ -275,6 +280,8 @@ int main () {
             while (fgets(temp, sizeof(temp), fp) != NULL) {
                 strcat(buffer, temp);
             }
+
+            //Instance: 4-3, preventing buffer leakage by closing file
             pclose(fp);
             response = buffer;
         }

@@ -25,7 +25,7 @@ char getLocalAddr() {
     hints.ai_socktype = SOCK_STREAM; // use TCP
 
     // get the address info for the localhost
-    //Instance ID: 4-8
+    //Instance ID: 2-8
     if ((status = getaddrinfo("localhost", NULL, &hints, &res)) != 0) {
         fprintf(stderr, "getaddrinfo error: %s\n", gai_strerror(status));
         exit(1);
@@ -68,7 +68,7 @@ void receive_cmd(int sock_fd, char *buffer, size_t buffer_size) {
 }
 
 // Generate a random number in the range of the registered TCP ports for use on the client
-//Instance ID: 7-2, avoiding ports below 1024 as they are restricted
+//Instance ID: 5-2, avoiding ports below 1024 as they are restricted
 int port_number() {
     int cntrl_port;
     srand(time(NULL));  // Seed the random number generator with the current time
@@ -79,10 +79,10 @@ int port_number() {
 }
 
 // Check to see if the port generated above is in use; if it is, try again
-//Instance ID: 7-1, avoiding using a port that is in use
+//Instance ID: 5-1, avoiding using a port that is in use
 int is_port_in_use(int port) {
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    //Instance ID: 4-1, catching exception
+    //Instance ID: 2-1, catching exception
     if (sockfd < 0) {
         perror("socket");
         exit(EXIT_FAILURE);
@@ -140,7 +140,7 @@ int main () {
 
 
     // Create control socket
-    //Instance ID: 4-2, catching exception
+    //Instance ID: 2-2, catching exception
     int cntrl_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
     if (cntrl_sock_fd < 0) {
         perror("Socket creation failed");
@@ -154,14 +154,14 @@ int main () {
     client_cntrl_addr.sin_port = htons(cntrl_port);
     socklen_t server_cntrl_addr_len = sizeof(client_cntrl_addr);
 
-    //Instance ID: 4-3, avoiding error by checking binding
+    //Instance ID: 2-3, avoiding error by checking binding
     if (bind(cntrl_sock_fd, (struct sockaddr *)&client_cntrl_addr, sizeof(client_cntrl_addr)) < 0) {
         perror("Bind failed");
         exit(EXIT_FAILURE);
     }
 
     // Start listening on the socket
-    //Instance ID: 4-4
+    //Instance ID: 2-4
     if (listen(cntrl_sock_fd, 1) < 0) {
         perror("Listen failed");
         exit(EXIT_FAILURE);
@@ -176,13 +176,13 @@ int main () {
     server_cntrl_addr.sin_port = htons(cntrl_port);
     is_port_in_use(cntrl_port);
 
-    //Instance ID: 4-5
+    //Instance ID: 2-5
     if (inet_pton(AF_INET, server_cntrl_address, &server_cntrl_addr.sin_addr) <= 0) {
         perror("Invalid server address");
         exit(EXIT_FAILURE);
     }
 
-    //Instance ID: 4-6
+    //Instance ID: 2-6
     if (connect(cntrl_sock_fd, (struct sockaddr *)&server_cntrl_addr, sizeof(server_cntrl_addr)) < 0) {
         perror("Connection failed");
         exit(EXIT_FAILURE);
@@ -204,7 +204,7 @@ int main () {
         scanf("%s", command);
 
         // COMMAND HANDLERS
-
+        //Instance ID: 3-1, preventing command injection but asking them what they would like to do and executing command from server side.
         // EXIT
         if (strncmp(command, EXIT, 4) == 0) {
             sprintf(buffer, "EXIT %s\r\n", file);
@@ -219,7 +219,7 @@ int main () {
 
             // Create data socket
             int data_sock_fd = socket(AF_INET, SOCK_STREAM, 0);
-            //Instance ID: 4-7
+            //Instance ID: 2-7
             if (data_sock_fd < 0) {
                 perror("Socket creation failed");
                 exit(EXIT_FAILURE);
@@ -251,7 +251,7 @@ int main () {
 
 
             // Open a file to write the data to
-            //Instance ID: 8-1, preventing existing data from being overwritten
+            //Instance ID: 6-1, preventing existing data from being overwritten
             int result = access(file, F_OK);
             if(result != 0) {
                 FILE *fp = fopen(file, "wb");
@@ -267,6 +267,7 @@ int main () {
                 fwrite(buffer, 1, bytes_received, fp);
             }
 
+            //Instance: 4-4, preventing buffer leakage by closing file
             fclose(fp);
             close(data_sock_fd);
 
